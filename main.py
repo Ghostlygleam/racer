@@ -2,9 +2,9 @@ import pygame
 import sys
 import random
 import time
+import math
 import pygame.transform
 from pygame.locals import *
-
 
 # Initializes all imported Pygame modules
 pygame.init()
@@ -22,9 +22,15 @@ WHITE = (255, 255, 255)
 YELLOW = (255, 255, 0)
 
 # Other variables for use in the program
-SCREEN_WIDTH = 400
-SCREEN_HEIGHT = 600
+SCREEN_WIDTH = 1000  
+SCREEN_HEIGHT = 800  
 SPEED = 1
+
+max_speed = 10
+acceleration = 0.05
+deceleration = 0.02
+turn_speed = 5
+
 lives = 5
 score = 0
 start_time = pygame.time.get_ticks()
@@ -55,27 +61,51 @@ class Enemy(pygame.sprite.Sprite):
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__() 
-        self.image = pygame.image.load("src/player.png").convert()  # Load player image
-        self.image = pygame.transform.scale(self.image, (50, 50))  # Scale the image to desired size
+        self.image = pygame.image.load("src/player.png").convert_alpha()  # Load player image
+        self.original_image = pygame.transform.scale(self.image, (50, 50))  # Scale the image to desired size
+        self.image = self.original_image.copy()
         self.rect = self.image.get_rect()  # Get the rectangle of the image
-        self.rect.center = (160, 520)  # Position the player near the bottom
+        self.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 80)  # Position the player near the bottom
+        self.angle = 0
+        self.speed = 0
 
     def move(self):
         pressed_keys = pygame.key.get_pressed()  # Get the current state of all keyboard buttons
-        # Uncomment the following lines to enable vertical movement
+
+        # acceleration and deceleration
+        if pressed_keys[pygame.K_UP]:
+            self.speed = min(max_speed, self.speed + acceleration)
+        elif pressed_keys[pygame.K_DOWN]:
+            self.speed = max(-max_speed, self.speed - acceleration)
+        else:
+            if self.speed > 0:
+                self.speed = max(0, self.speed - deceleration)
+            elif self.speed < 0:
+                self.speed = min(0, self.speed + deceleration)
         
-        
-        if self.rect.left > 0:
-            if pressed_keys[pygame.K_LEFT]:  # Move left if left arrow is pressed
-                self.rect.move_ip(-5, 0)
-        if self.rect.right < SCREEN_WIDTH:
-            if pressed_keys[pygame.K_RIGHT]:  # Move right if right arrow is pressed
-                self.rect.move_ip(5, 0)
-                
-        if pressed_keys[K_UP]:
-            self.rect.move_ip(0, -5)
-        if pressed_keys[K_DOWN]:
-            self.rect.move_ip(0, 5)
+        # turn
+        if pressed_keys[pygame.K_LEFT]:
+            self.angle += turn_speed
+        if pressed_keys[pygame.K_RIGHT]:
+            self.angle -= turn_speed
+
+        # Update car position
+        self.rect.x += self.speed * math.sin(math.radians(self.angle))
+        self.rect.y -= self.speed * math.cos(math.radians(self.angle))
+
+        # Screen rect check
+        if self.rect.left < 0:
+            self.rect.left = 0
+        if self.rect.right > SCREEN_WIDTH:
+            self.rect.right = SCREEN_WIDTH
+        if self.rect.top < 0:
+            self.rect.top = 0
+        if self.rect.bottom > SCREEN_HEIGHT:
+            self.rect.bottom = SCREEN_HEIGHT
+
+        # Turn car image
+        self.image = pygame.transform.rotate(self.original_image, self.angle)
+        self.rect = self.image.get_rect(center=self.rect.center)
 
 # Class for the coin sprite
 class Coin(pygame.sprite.Sprite):
@@ -113,7 +143,7 @@ running = True
 while running:
     for event in pygame.event.get():
         if event.type == INC_SPEED:
-            SPEED += 2
+            SPEED += 0.2
         if event.type == pygame.QUIT:
             running = False
 
@@ -147,9 +177,9 @@ while running:
         if lives == 0:
             wasted_font = pygame.font.Font(None, 36)
             wasted_text = wasted_font.render("Wasted", True, RED)
-            DISPLAYSURF.blit(wasted_text, (150, 250))
+            DISPLAYSURF.blit(wasted_text, (SCREEN_WIDTH//2 - 50, SCREEN_HEIGHT//2 - 50))
             final_score_text = font.render(f"Score: {score}", True, YELLOW)
-            DISPLAYSURF.blit(final_score_text, (150, 300))
+            DISPLAYSURF.blit(final_score_text, (SCREEN_WIDTH//2 - 50, SCREEN_HEIGHT//2))
             pygame.display.update()
             end_time = pygame.time.get_ticks()
             duration = (end_time - start_time) // 1000  # Duration in seconds
